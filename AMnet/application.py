@@ -1,5 +1,5 @@
 import keras
-import WAnet.training
+import AMnet.training
 import numpy
 
 

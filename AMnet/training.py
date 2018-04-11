@@ -13,7 +13,8 @@ def load_data():
 
     file_list = [f for f in os.listdir(path_to_data) if os.path.isfile(os.path.join(path_to_data, f))]
     for file in file_list:
-        dat = scipy.io.loadmat(os.path.join(path_to_data, file))
+        data = scipy.io.loadmat(os.path.join(path_to_data, file))
+        print(data)
 
     return geometry, volume, flattened_geometry, N, G
 

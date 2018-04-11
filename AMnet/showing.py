@@ -1,5 +1,5 @@
 from mpl_toolkits.mplot3d import Axes3D
-import WAnet.application
+import AMnet.application
 import matplotlib.pyplot
 import numpy
 import pkg_resources
