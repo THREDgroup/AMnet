@@ -1,4 +1,3 @@
-import WAnet.training
-import WAnet.preprocessing
-import WAnet.showing
-import WAnet.application
+import AMnet.training
+import AMnet.showing
+import AMnet.application

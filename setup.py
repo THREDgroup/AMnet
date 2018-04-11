@@ -7,7 +7,7 @@ with open('LICENSE') as f:
     license = f.read()
 
 setup(
-    name='WAnet',
+    name='AMnet',
     version='0.0.1',
     long_description=readme,
     author='Christopher McComb',

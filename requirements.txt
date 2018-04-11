@@ -2,7 +2,7 @@ numpy
 keras
 theano
 scipy
-sklearn
+scikit-learn
 matplotlib
 h5py
 pydot
