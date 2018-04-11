@@ -3,28 +3,29 @@ import sklearn.model_selection
 import numpy
 import pkg_resources
 import os
-import scipy.io
 
-VERBOSE = 0
+VERBOSE = 2
+
 
 def load_data():
 
-    path_to_data = os.path.join('Users', 'ccm' 'Box Sync', 'ML+AM', 'Voxelized GE Files', 'Voxelized_GE_Files_10')
-
-    file_list = [f for f in os.listdir(path_to_data) if os.path.isfile(os.path.join(path_to_data, f))]
-    for file in file_list:
-        data = scipy.io.loadmat(os.path.join(path_to_data, file))
-        print(data)
+    geometric_data = numpy.load(pkg_resources.resource_filename('AMnet', 'data/data_geometry.npz'))
+    geometry = geometric_data['geometry']
+    flattened_geometry = geometric_data['flattened_geometry']
+    volume = geometric_data['volume']
+    constants = numpy.load(pkg_resources.resource_filename('AMnet', 'data/constants.npz'))
+    N = constants['N']
+    G = constants['G']
 
     return geometry, volume, flattened_geometry, N, G
 
 
-def train_geometry_autoencoder(epochs, latent_dim, save_results, print_network):
+def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     geometry, volume, flattened_geometry, N, G = load_data()
 
     batch_size = 100
     original_dim = G*G*G
-    intermediate_dim = 256
+    intermediate_dim = int(pow(10, ((numpy.log10(latent_dim)+numpy.log10(original_dim))/2)))
     epsilon_std = 1.0
 
     x = keras.layers.Input(shape=(original_dim,))
@@ -72,8 +73,8 @@ def train_geometry_autoencoder(epochs, latent_dim, save_results, print_network):
 
     x_train, x_test = sklearn.model_selection.train_test_split(flattened_geometry, shuffle=False)
 
-    weights = pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'temp_vae_weights.h5')
-    logger = pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_vae_training.csv')
+    weights = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'temp_vae_weights.h5')
+    logger = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_vae_training.csv')
     vae.fit(x_train,
             shuffle=True,
             epochs=epochs,
@@ -104,34 +105,34 @@ def train_geometry_autoencoder(epochs, latent_dim, save_results, print_network):
     weights = []
     if save_results:
         # Save encoder structure and weights
-        temp = open(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_structure.yml'), 'w')
+        temp = open(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_structure.yml'), 'w')
         temp.write(encoder.to_yaml())
         temp.close()
-        encoder.save_weights(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_weights.h5'))
+        encoder.save_weights(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_weights.h5'))
 
         # Save decoder structure and weights
-        temp = open(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_decoder_structure.yml'), 'w')
+        temp = open(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_decoder_structure.yml'), 'w')
         temp.write(generator.to_yaml())
         temp.close()
-        generator.save_weights(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_decoder_weights.h5'))
+        generator.save_weights(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_decoder_weights.h5'))
 
         # Save full autoencoder structure and weights
-        structure = pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_autoencoder_structure.yml')
-        weights = pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_autoencoder_weights.h5')
+        structure = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_autoencoder_structure.yml')
+        weights = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_autoencoder_weights.h5')
         temp = open(structure, 'w')
         temp.write(autoencoder.to_yaml())
         temp.close()
         autoencoder.save_weights(weights)
 
     if print_network:
-        keras.utils.plot_model(generator, to_file=pkg_resources.resource_filename('WAnet', 'figures/'+str(latent_dim)+'geometry_decoder.eps'), show_shapes=True)
-        keras.utils.plot_model(encoder, to_file=pkg_resources.resource_filename('WAnet', 'figures/'+str(latent_dim)+'geometry_encoder.eps'), show_shapes=True)
-        keras.utils.plot_model(autoencoder, to_file=pkg_resources.resource_filename('WAnet', 'figures/'+str(latent_dim)+'geometry_autoencoder.eps'), show_shapes=True)
+        keras.utils.plot_model(generator, to_file=pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'geometry_decoder.eps'), show_shapes=True)
+        keras.utils.plot_model(encoder, to_file=pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'geometry_encoder.eps'), show_shapes=True)
+        keras.utils.plot_model(autoencoder, to_file=pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'geometry_autoencoder.eps'), show_shapes=True)
 
     # Final check on metrics
     x_pred = autoencoder.predict(x_test)
     mse = keras.backend.mean(keras.losses.binary_crossentropy(x_pred, x_test)).eval()
-    x_pred.fill(numpy.mean(x_test.flatten()))
+    x_pred.fill(numpy.mean(x_train.flatten()))
     s2 = keras.backend.mean(keras.losses.binary_crossentropy(x_pred, x_test)).eval()
     r2 = 1-mse/s2
     print("Final BCE: "+str(mse))
@@ -139,50 +140,68 @@ def train_geometry_autoencoder(epochs, latent_dim, save_results, print_network):
     print("Final R2: "+str(r2))
     return r2
 
+
+def convoluational_autoencoder():
+    input_img = keras.layers.Input(shape=(28, 28, 1))  # adapt this if using `channels_first` image data format
+
+    x = keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
+    x = keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+    x = keras.layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+    x = keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+    x = keras.layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+    encoded = keras.layers.MaxPooling2D((2, 2), padding='same')(x)
+
+    # at this point the representation is (4, 4, 8) i.e. 128-dimensional
+
+    x = keras.layers.Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
+    x = keras.layers.UpSampling2D((2, 2))(x)
+    x = keras.layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
+    x = keras.layers.UpSampling2D((2, 2))(x)
+    x = keras.layers.Conv2D(16, (3, 3), activation='relu')(x)
+    x = keras.layers.UpSampling2D((2, 2))(x)
+    decoded = keras.layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+
+    autoencoder = keras.models.Model(input_img, decoded)
+    autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
+
 def train_forward_network(epochs, latent_dim, save_results, print_network):
-    curves, geometry, S, N, D, F, G, flattened_curves, flattened_geometry = load_data()
+    batch_size = 100
+
+    geometry, volume, flattened_geometry, N, G = load_data()
+    original_dim = pow(G, 3)
+    intermediate_dim = int(pow(10, ((numpy.log10(latent_dim)+numpy.log10(original_dim))/2)))
 
     # Define model
-    x   = keras.layers.Input(shape=(32768,))
-    de1 = keras.layers.Dense(256, activation='relu')(x)
+    x   = keras.layers.Input(shape=(original_dim,))
+    de1 = keras.layers.Dense(intermediate_dim, activation='relu')(x)
     de2 = keras.layers.Dense(latent_dim, activation='relu')(de1)
     con = keras.layers.Dense(latent_dim, activation='relu')(de2)
-    dd2 = keras.layers.Dense(64, activation='relu')(con)
-    y   = keras.layers.Dense(192, activation='sigmoid')(dd2)
+    dd2 = keras.layers.Dense(int(latent_dim/2), activation='relu')(con)
+    y   = keras.layers.Dense(1, activation='sigmoid')(dd2)
 
     # Build and compile ,model
     mdl = keras.models.Model(x, y)
     mdl.compile(optimizer='rmsprop', loss='mse')
 
     # # Instantiate and freeze layers if possible
-    temp = open(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_structure.yml'), 'r')
-    geo = keras.models.model_from_yaml(temp.read())
-    geo.load_weights(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_weights.h5'))
-
-    # Load curve autoencoder
-    temp = open(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'curve_decoder_structure.yml'), 'r')
-    curve = keras.models.model_from_yaml(temp.read())
-    curve.load_weights(pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'curve_decoder_weights.h5'))
-
-    mdl.layers[1].set_weights(geo.layers[1].get_weights())
-    mdl.layers[1].trainable = False
-    mdl.layers[2].set_weights(geo.layers[2].get_weights())
-    mdl.layers[2].trainable = False
-
-    mdl.layers[4].set_weights(curve.layers[1].get_weights())
-    mdl.layers[4].trainable = False
-    mdl.layers[5].set_weights(curve.layers[2].get_weights())
-    mdl.layers[5].trainable = False
+    # temp = open(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_structure.yml'), 'r')
+    # geo = keras.models.model_from_yaml(temp.read())
+    # geo.load_weights(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_weights.h5'))
+    # mdl.layers[1].set_weights(geo.layers[1].get_weights())
+    # mdl.layers[1].trainable = False
+    # mdl.layers[2].set_weights(geo.layers[2].get_weights())
+    # mdl.layers[2].trainable = False
 
     # Make file names
-    weights = pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'forward_weights.h5')
-    structure = pkg_resources.resource_filename('WAnet', 'trained_models/'+str(latent_dim)+'forward_structure.yml')
-    plot = pkg_resources.resource_filename('WAnet', 'figures/'+str(latent_dim)+'forward.eps')
+    weights = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'forward_weights.h5')
+    structure = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'forward_structure.yml')
+    plot = pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'forward.eps')
 
     # Save model structure and start training
-    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(flattened_geometry, flattened_curves, shuffle=False)
+    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(flattened_geometry, volume, shuffle=False)
+
     if save_results:
-        mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, shuffle=False, validation_data=(x_test, y_test),
+        mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, batch_size=batch_size, shuffle=False, validation_data=(x_test, y_test),
                 callbacks=[keras.callbacks.ModelCheckpoint(filepath=weights, verbose=VERBOSE, save_best_only=True)])
 
         # Save decoder structure and weights
@@ -190,7 +209,7 @@ def train_forward_network(epochs, latent_dim, save_results, print_network):
         temp.write(mdl.to_yaml())
         temp.close()
     else:
-        mdl.fit(flattened_geometry, flattened_curves, verbose=VERBOSE, epochs=epochs, shuffle=False, validation_data=(x_test, y_test))
+        mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, shuffle=False, batch_size=batch_size, validation_data=(x_test, y_test))
 
     if print_network:
         keras.utils.plot_model(mdl, to_file=plot, show_shapes=True)
@@ -198,7 +217,7 @@ def train_forward_network(epochs, latent_dim, save_results, print_network):
     #
     mdl.load_weights(weights)
     y_pred = mdl.predict(x_test)
-    s2 = numpy.mean(numpy.power(numpy.mean(y_test.flatten()) - y_test.flatten(), 2))
+    s2 = numpy.mean(numpy.power(numpy.mean(y_train.flatten()) - y_test.flatten(), 2))
     mse = keras.backend.mean(keras.losses.mean_squared_error(y_pred, y_test)).eval()
     r2 = 1-mse/s2
     print("Final MSE: "+str(mse))

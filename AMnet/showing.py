@@ -99,9 +99,9 @@ def plot_curves(ax, true, line_style, topper, axes_off, x=None):
 
 def plot_examples(case, nx, ny, quick=True):
     # Load network
-    structure = pkg_resources.resource_filename("WAnet", "trained_models/"+case+"_structure.yml")
-    weights = pkg_resources.resource_filename("WAnet", "trained_models/"+case+"_weights.h5")
-    nw = WAnet.application.Network(structure, weights)
+    structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_structure.yml")
+    weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_weights.h5")
+    nw = AMnet.application.Network(structure, weights)
 
     # Find out if its an autoencoder or a predictor
     if nw.network.layers[0].input_shape[1] == nw.network.layers[-1].output_shape[1]:
@@ -150,32 +150,4 @@ def plot_examples(case, nx, ny, quick=True):
             ax = matplotlib.pyplot.subplot(ny, nx*mult, idx)
             plot_curves(ax, op, '--', y_top, True)
 
-    matplotlib.pyplot.savefig(pkg_resources.resource_filename("WAnet", "figures/"+case+"_examples.png"), dpi=1000)
-
-
-def plot_BIEM_example():
-    curves, geometry, S, N, D, F, G, new_curves, new_geometry = WAnet.training.load_data()
-    idx = numpy.random.randint(1, S*N)
-
-    ax = matplotlib.pyplot.subplot(1, 2, 1)
-    x = numpy.linspace(0.05, 2, F)
-    plot_curves(ax, new_curves[idx].reshape((D, F))*1000000, '-', 0, False, x)
-    ax.set_xlabel('Frequency ($rad/s$)')
-    ax.set_ylabel('Spectral Force ($N$ or $Nm$)')
-    matplotlib.pyplot.legend(['Surge', 'Heave', 'Pitch'])
-
-    matplotlib.pyplot.tight_layout()
-    matplotlib.pyplot.savefig(pkg_resources.resource_filename("WAnet", "figures/BIEM_example_curve.png"), dpi=1000)
-
-    ax = matplotlib.pyplot.subplot(1, 2, 1, projection='3d')
-    ex = 5 - 5 / G
-    xyz = (numpy.linspace(-ex, ex, G), numpy.linspace(-ex, ex, G), numpy.linspace(-(9.5 - 5 / G), 0.5 - 5 / G, G))
-    plot_voxels(ax, new_geometry[idx].reshape((G, G, G), order='F'), 'b', False, False, xyz)
-    ax.set_xlabel('x ($m$)')
-    ax.set_ylabel('y ($m$)')
-    ax.set_zlabel('z ($m$)')
-
-    matplotlib.pyplot.tight_layout()
-    matplotlib.pyplot.savefig(pkg_resources.resource_filename("WAnet", "figures/BIEM_example_geometry.png"), dpi=1000)
-
-
+    matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)
