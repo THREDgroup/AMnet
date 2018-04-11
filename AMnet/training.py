@@ -4,7 +4,7 @@ import numpy
 import pkg_resources
 import os
 
-VERBOSE = 2
+VERBOSE = 1
 
 
 def load_data():
@@ -165,7 +165,7 @@ def convoluational_autoencoder():
     autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
 
 def train_forward_network(epochs, latent_dim, save_results, print_network):
-    batch_size = 100
+    batch_size = 10
 
     geometry, volume, flattened_geometry, N, G = load_data()
     original_dim = pow(G, 3)

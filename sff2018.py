@@ -1,7 +1,7 @@
 import AMnet
 
 PRE_PROCESS = True
-TRAIN = True
+TRAIN = not True
 EXAMPLES = not True
 QUICK = False
 

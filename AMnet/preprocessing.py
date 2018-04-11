@@ -14,11 +14,14 @@ def extract_data(path_to_data):
     sumsum = []
     for file in file_list:
         data = scipy.io.loadmat(os.path.join(path_to_data, file))
+        print(sum(data['Voxelized_GE_file_10_'].flatten()))
         v = sum(data['Voxelized_GE_file_10_'].flatten()/pow(len(data['Voxelized_GE_file_10_']), 3))
         if v > 0.005:
             geometry.append(data['Voxelized_GE_file_10_'])
             flattened_geometry.append(data['Voxelized_GE_file_10_'].flatten())
             volume.append(v)
+        elif v == 0:
+            print(file)
 
     N = len(geometry)
     print(N)
