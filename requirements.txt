@@ -1,0 +1,9 @@
+numpy
+keras
+theano
+scipy
+sklearn
+matplotlib
+h5py
+pydot
+graphviz
