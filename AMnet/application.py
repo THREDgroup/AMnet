@@ -1,5 +1,5 @@
 import keras
-import AMnet.training
+import AMnet.utilities
 import numpy
 
 
@@ -7,13 +7,9 @@ class Network(object):
 
     def __init__(self, structure, weights):
         # Instantiate variables
-        self.curves = 0
-        self.new_curves = 0
         self.geometry = 0
         self.flattened_geometry = 0
         self.N = 0
-        self.D = 0
-        self.F = 0
         self.G = 0
 
         # Load network
@@ -25,7 +21,7 @@ class Network(object):
         self._load_data()
 
     def _load_data(self):
-        self.geometry, self.volume, self.flattened_geometry, self.N, self.G = AMnet.training.load_data()
+        self.geometry, self.volume, self.flattened_geometry, self.N, self.G = AMnet.utilities.load_data()
 
     def prediction(self, idx=None):
 
@@ -38,8 +34,8 @@ class Network(object):
             data_input = self.flattened_geometry[idx:(idx+1), :]
             other_data_input = data_input.reshape((self.G, self.G, self.G), order='F')
         else:
-            data_input = self.new_curves[idx:(idx+1), :]
-            other_data_input = data_input.reshape((3, self.F))
+            data_input = self.geometry[idx:(idx+1)]
+            other_data_input = self.geometry[idx:(idx+1)]
 
         # Get the outputs
         predicted_output = self.network.predict(data_input)
@@ -47,7 +43,6 @@ class Network(object):
             true_output = self.flattened_geometry[idx].reshape((self.G, self.G, self.G), order='F')
             predicted_output = predicted_output.reshape((self.G, self.G, self.G), order='F')
         else:
-            true_output = self.new_curves[idx].reshape((3, self.F))
-            predicted_output = predicted_output.reshape((3, self.F))
+            true_output = self.geometry[idx:(idx+1)]
 
         return idx, other_data_input, true_output, predicted_output

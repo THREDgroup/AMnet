@@ -97,57 +97,25 @@ def plot_curves(ax, true, line_style, topper, axes_off, x=None):
     ax.set_aspect((x1 - x0) / (y1 - y0))
 
 
-def plot_examples(case, nx, ny, quick=True):
+def plot_autoencoder_examples(case, nx, ny, quick=True):
     # Load network
     structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_structure.yml")
     weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_weights.h5")
     nw = AMnet.application.Network(structure, weights)
 
-    # Find out if its an autoencoder or a predictor
-    if nw.network.layers[0].input_shape[1] == nw.network.layers[-1].output_shape[1]:
-        mult = 2
-    else:
-        mult = 3
+    mult = 2
 
     for i in range(1, nx*ny*mult, mult):
         [_, ip, ot, op] = nw.prediction()
         idx = i
 
-        y_top = 0
-        if len(ip.shape) == 2:
-            y_top = 1.1*numpy.max([y_top, numpy.max(ip.flatten())])
-        if len(ot.shape) == 2:
-            y_top = 1.1*numpy.max([y_top, numpy.max(ot.flatten())])
-        if len(op.shape) == 2:
-            y_top = 1.1*numpy.max([y_top, numpy.max(op.flatten())])
-
-        print(y_top)
-
         # Plot input
-        if len(ip.flatten()) == pow(nw.G, 3):
-            ax = matplotlib.pyplot.subplot(ny, nx * mult, idx, projection='3d')
-            plot_voxels(ax, ip, 'b', quick, True)
-        else:
-            ax = matplotlib.pyplot.subplot(ny, nx * mult, idx)
-            plot_curves(ax, ip, '-', y_top, True)
-
-        # Plot true output
-        if mult == 3:
-            idx = idx + 1
-            if len(op.flatten()) == pow(nw.G, 3):
-                ax = matplotlib.pyplot.subplot(ny, nx * mult, idx, projection='3d')
-                plot_voxels(ax, ot, 'b', quick, True)
-            else:
-                ax = matplotlib.pyplot.subplot(ny, nx*mult, idx)
-                plot_curves(ax, ot, '-', y_top, True)
+        ax = matplotlib.pyplot.subplot(ny, nx * mult, idx, projection='3d')
+        plot_voxels(ax, ip, 'b', quick, True)
 
         # Plot predicted output
         idx = idx + 1
-        if len(op.flatten()) == pow(nw.G, 3):
-            ax = matplotlib.pyplot.subplot(ny, nx * mult, idx, projection='3d')
-            plot_voxels(ax, op, 'g', quick, True)
-        else:
-            ax = matplotlib.pyplot.subplot(ny, nx*mult, idx)
-            plot_curves(ax, op, '--', y_top, True)
+        ax = matplotlib.pyplot.subplot(ny, nx * mult, idx, projection='3d')
+        plot_voxels(ax, op, 'g', quick, True)
 
     matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)
