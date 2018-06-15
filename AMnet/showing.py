@@ -41,7 +41,7 @@ def plot_voxels(ax, matrix, color, quick, axes_off, xyz=None):
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
             for k in range(matrix.shape[2]):
-                if matrix[i, j, k] > 0.51:
+                if matrix[i, j, k] > 0.5:
                     if quick:
                         _plot_dot(position=(i-0.5, j-0.5, k-0.5), ax=ax, color=color)
                     else:
@@ -97,7 +97,7 @@ def plot_curves(ax, true, line_style, topper, axes_off, x=None):
     ax.set_aspect((x1 - x0) / (y1 - y0))
 
 
-def plot_autoencoder_examples(case, nx, ny, quick=True):
+def plot_random_autoencoder_examples(case, nx, ny, quick=True):
     # Load network
     structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_structure.yml")
     weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_weights.h5")
@@ -117,5 +117,30 @@ def plot_autoencoder_examples(case, nx, ny, quick=True):
         idx = idx + 1
         ax = matplotlib.pyplot.subplot(ny, nx * mult, idx, projection='3d')
         plot_voxels(ax, op, 'g', quick, True)
+
+    matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)
+
+
+def plot_autoencoder_examples_along_axis(case, index, quick=True):
+
+    # Load network
+    structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_structure.yml")
+    weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_weights.h5")
+    nw = AMnet.application.Network(structure, weights)
+    nx = nw.network.layers[0].input_shape[1]
+
+    r = numpy.linspace(-1, 1, nx)
+
+    counter = 0
+    for i in range(nx):
+        for j in range(nx):
+            vector = numpy.zeros([1, nx])
+
+            # Plot input
+            vector[0][j] = r[i]
+            ax = matplotlib.pyplot.subplot(nx, nx, counter+1, projection='3d')
+            output = nw.prediction_from_encoded(vector)
+            plot_voxels(ax, output, 'g', quick, True)
+            counter += 1
 
     matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)

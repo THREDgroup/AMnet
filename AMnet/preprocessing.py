@@ -7,7 +7,9 @@ import AMnet.utilities
 import random
 
 
-def extract_data(path_to_data):
+def extract_data(size):
+
+    path_to_data = pkg_resources.resource_filename("AMnet", "data/Voxelized_GE_Files_"+size+"/")
 
     file_list = [f for f in os.listdir(path_to_data) if os.path.isfile(os.path.join(path_to_data, f))]
     geometry = []
@@ -15,13 +17,15 @@ def extract_data(path_to_data):
     volume = []
     sumsum = []
     for file in file_list:
+        print(file)
         data = scipy.io.loadmat(os.path.join(path_to_data, file))
-        print(sum(data['Voxelized_GE_file_10_'].flatten()))
-        v = sum(data['Voxelized_GE_file_10_'].flatten()/pow(len(data['Voxelized_GE_file_10_']), 3))
-        if v > 0.005:
-            geometry.append(data['Voxelized_GE_file_10_'])
-            flattened_geometry.append(data['Voxelized_GE_file_10_'].flatten())
+        # print(sum(data['c'].flatten()))
+        v = sum(data['c'].flatten()/pow(len(data['c']), 3))
+        if v > 0.001:
+            geometry.append(data['c'])
+            flattened_geometry.append(data['c'].flatten())
             volume.append(v)
+            print("good")
         elif v == 0:
             print(file)
 

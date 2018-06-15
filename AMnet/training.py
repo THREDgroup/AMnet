@@ -11,7 +11,7 @@ VERBOSE = 1
 def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
 
-    batch_size = 100
+    batch_size = 10
     original_dim = G*G*G
     intermediate_dim1 = int(pow(10, (0.5*numpy.log10(latent_dim)+0.5*numpy.log10(original_dim))))
     epsilon_std = 1.0
@@ -24,7 +24,7 @@ def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     def sampling(args):
         z_mean, z_log_var = args
         epsilon = keras.backend.random_normal(shape=(keras.backend.shape(z_mean)[0], latent_dim), mean=0.,
-                                  stddev=epsilon_std)
+                                              stddev=epsilon_std)
         return z_mean + keras.backend.exp(z_log_var / 2) * epsilon
 
     # note that "output_shape" isn't necessary with the TensorFlow backend
@@ -132,7 +132,7 @@ def variational_autoencoder(epochs, latent_dim, save_results, print_network):
 def convolutional_autoencoder(epochs, print_network):
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
 
-    batch_size = 100
+    batch_size = 200
 
     new_geometry = numpy.expand_dims(geometry, 4)
 
@@ -153,6 +153,7 @@ def convolutional_autoencoder(epochs, print_network):
 
     cae = keras.models.Model(input_vox, decoded)
     cae.compile(optimizer='rmsprop', loss='binary_crossentropy')
+    # cae.compile(optimizer='adadelta', loss='mse')
     plot = pkg_resources.resource_filename('AMnet', 'figures/conv_autoencoder.eps')
     if print_network:
         keras.utils.plot_model(cae, to_file=plot, show_shapes=True)
@@ -191,7 +192,7 @@ def convolutional_autoencoder(epochs, print_network):
 
 
 def train_forward_network(epochs, latent_dim, save_results, print_network, load_previous=True):
-    batch_size = 100
+    batch_size = 10
 
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
     volume = 10000*volume
@@ -254,7 +255,7 @@ def train_forward_network(epochs, latent_dim, save_results, print_network, load_
 
 
 def train_convolutional_forward_network(epochs, latent_dim, save_results, print_network, load_previous=True):
-    batch_size = 100
+    batch_size = 300
 
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
     volume = 10000*volume

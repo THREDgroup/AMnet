@@ -46,3 +46,6 @@ class Network(object):
             true_output = self.geometry[idx:(idx+1)]
 
         return idx, other_data_input, true_output, predicted_output
+
+    def prediction_from_encoded(self, vector):
+        return self.network.predict(vector).reshape((self.G, self.G, self.G), order='F')
