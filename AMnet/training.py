@@ -11,7 +11,7 @@ VERBOSE = 1
 def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
 
-    batch_size = 10
+    batch_size = 120
     original_dim = G*G*G
     intermediate_dim1 = int(pow(10, (0.5*numpy.log10(latent_dim)+0.5*numpy.log10(original_dim))))
     epsilon_std = 1.0

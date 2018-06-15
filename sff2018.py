@@ -1,6 +1,6 @@
 import AMnet
 
-PRE_PROCESS = True
+PRE_PROCESS = False
 TRAIN = True
 EXAMPLES = True
 QUICK = False

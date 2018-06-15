@@ -53,15 +53,20 @@ def augment_data():
 
     # Make some rotation options
     faces = []
-    faces.append([])
+    faces.append([1, (1, 2)])
+    faces.append([2, (1, 2)])
+    faces.append([3, (1, 2)])
+    faces.append([4, (1, 2)])
+    faces.append([1, (0, 2)])
+    faces.append([3, (0, 2)])
 
     for i, part in enumerate(geometry):
         for face in faces:
-
             vol = volume[i]
             temp = part
+            temp = numpy.rot90(temp, face[0], face[1])
             for quadrant in range(4):
-                temp_rotated = numpy.rot90(temp, quadrant+1)
+                temp_rotated = numpy.rot90(temp, quadrant+1, (0, 1))
                 augmented_geometry.append(temp_rotated)
                 augmented_flattened_geometry.append(temp_rotated.flatten())
                 augmented_volume.append(vol)
