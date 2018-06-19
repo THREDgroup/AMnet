@@ -3,6 +3,7 @@ import AMnet.application
 import matplotlib.pyplot
 import numpy
 import pkg_resources
+import keras
 
 
 def _cuboid_data(pos, size=(1, 1, 1)):
@@ -71,32 +72,6 @@ def plot_voxels(ax, matrix, color, quick, axes_off, xyz=None):
     ax.set_aspect('equal')
 
 
-def plot_curves(ax, true, line_style, topper, axes_off, x=None):
-    if x is not None:
-        f = x
-    else:
-        f = range(len(true[0, :]))
-
-    ax.plot(f, true[0, :], 'r'+line_style,
-            f, true[1, :], 'b'+line_style,
-            f, true[2, :], 'g'+line_style,
-            )
-
-    if axes_off:
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-
-    # Get and reset ylim
-    if topper is not 0:
-        y0, y1 = ax.get_ylim()
-        ax.set_ylim([y0, topper])
-
-    # Scale to square
-    x0, x1 = ax.get_xlim()
-    y0, y1 = ax.get_ylim()
-    ax.set_aspect((x1 - x0) / (y1 - y0))
-
-
 def plot_random_autoencoder_examples(case, nx, ny, quick=True):
     # Load network
     structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_structure.yml")
@@ -121,7 +96,7 @@ def plot_random_autoencoder_examples(case, nx, ny, quick=True):
     matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)
 
 
-def plot_autoencoder_examples_along_axis(case, index, quick=True):
+def plot_autoencoder_examples_along_axis(case, dimensions, instances, quick=True):
 
     # Load network
     structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_structure.yml")
@@ -129,18 +104,86 @@ def plot_autoencoder_examples_along_axis(case, index, quick=True):
     nw = AMnet.application.Network(structure, weights)
     nx = nw.network.layers[0].input_shape[1]
 
-    r = numpy.linspace(-1, 1, nx)
+    r = numpy.linspace(-1, 1, instances)
 
     counter = 0
-    for i in range(nx):
-        for j in range(nx):
+    for i in range(instances):
+        for j in range(dimensions):
             vector = numpy.zeros([1, nx])
 
             # Plot input
             vector[0][j] = r[i]
-            ax = matplotlib.pyplot.subplot(nx, nx, counter+1, projection='3d')
+            ax = matplotlib.pyplot.subplot(dimensions, instances, counter+1, projection='3d')
             output = nw.prediction_from_encoded(vector)
             plot_voxels(ax, output, 'g', quick, True)
             counter += 1
 
     matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)
+
+def plot_delta_along_axes(case, dimensions, instances, delta):
+    # Load the autoencoder
+    structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_autoencoder_structure.yml")
+    weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_autoencoder_weights.h5")
+    autoencoder_network = AMnet.application.Network(structure, weights)
+
+    # Load data
+    geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
+
+    # Find best example design
+    output = autoencoder_network.predict_raw(flattened_geometry)
+    mse = keras.backend.mean(keras.losses.binary_crossentropy(flattened_geometry, output)).eval()
+    vec = mse
+    best_index = numpy.argmin(vec)
+
+    # Load the encoder
+    structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_encoder_structure.yml")
+    weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_encoder_weights.h5")
+    encoder_network = AMnet.application.Network(structure, weights)
+
+    # Load the encoder
+    structure = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_decoder_structure.yml")
+    weights = pkg_resources.resource_filename("AMnet", "trained_models/"+case+"_decoder_weights.h5")
+    decoder_network = AMnet.application.Network(structure, weights)
+    nx = decoder_network.network.layers[0].input_shape[1]
+
+    # Encode the best index
+    output = encoder_network.predict_raw(flattened_geometry[best_index:(best_index + 1), :])
+    print(output)
+
+    counter = 0
+
+    deltas = numpy.linspace(-delta, delta, instances)
+
+    for j in range(dimensions):
+        for i in range(instances):
+            vector = output
+
+            # Plot input
+            vector[0][j] += deltas[i]
+            ax = matplotlib.pyplot.subplot(dimensions, instances, counter+1, projection='3d')
+            plot_voxels(ax, decoder_network.prediction_from_encoded(vector), 'g', False, True)
+            counter += 1
+
+    matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/"+case+"_examples.png"), dpi=1000)
+
+
+def plot_examples_for_data_augmentation(idx):
+    geometry, _, _, N, _ = AMnet.utilities.load_data()
+
+    # Make some rotation options
+    faces = []
+    faces.append([1, (1, 2)])
+    faces.append([2, (1, 2)])
+    faces.append([3, (1, 2)])
+    faces.append([4, (1, 2)])
+    faces.append([1, (0, 2)])
+    faces.append([3, (0, 2)])
+
+    for i, part in enumerate(geometry):
+        for j, face in enumerate(faces):
+            temp = part
+            temp = numpy.rot90(temp, face[0], face[1])
+            for quadrant in range(4):
+                temp_rotated = numpy.rot90(temp, quadrant+1, (0, 1))
+
+    return True

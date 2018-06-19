@@ -11,9 +11,10 @@ VERBOSE = 1
 def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
 
-    batch_size = 120
+    batch_size = 50
     original_dim = G*G*G
-    intermediate_dim1 = int(pow(10, (0.5*numpy.log10(latent_dim)+0.5*numpy.log10(original_dim))))
+    # intermediate_dim1 = int(pow(10, (0.5*numpy.log10(latent_dim)+0.5*numpy.log10(original_dim))))
+    intermediate_dim1 = 256
     epsilon_std = 1.0
 
     x = keras.layers.Input(shape=(original_dim,))
@@ -129,80 +130,19 @@ def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     return r2
 
 
-def convolutional_autoencoder(epochs, print_network):
-    geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
-
-    batch_size = 200
-
-    new_geometry = numpy.expand_dims(geometry, 4)
-
-    input_vox = keras.layers.Input(shape=(G, G, G, 1))  # adapt this if using `channels_first` image data format
-
-    x = keras.layers.Conv3D(16, (1, 1, 1), activation='relu', padding='same')(input_vox)
-    x = keras.layers.MaxPooling3D((2, 2, 2), padding='valid')(x)
-    x = keras.layers.Conv3D(8, (1, 1, 1), activation='relu', padding='same')(x)
-    x = keras.layers.MaxPooling3D((5, 5, 5), padding='valid')(x)
-
-    # at this point the representation is (4, 4, 8) i.e. 128-dimensional
-
-    x = keras.layers.Conv3D(8, (1, 1, 1), activation='relu', padding='same')(x)
-    x = keras.layers.UpSampling3D((5, 5, 5))(x)
-    x = keras.layers.Conv3D(16, (1, 1, 1), activation='relu', padding='same')(x)
-    x = keras.layers.UpSampling3D((2, 2, 2))(x)
-    decoded = keras.layers.Conv3D(1, (1, 1, 1), activation='sigmoid', padding='same')(x)
-
-    cae = keras.models.Model(input_vox, decoded)
-    cae.compile(optimizer='rmsprop', loss='binary_crossentropy')
-    # cae.compile(optimizer='adadelta', loss='mse')
-    plot = pkg_resources.resource_filename('AMnet', 'figures/conv_autoencoder.eps')
-    if print_network:
-        keras.utils.plot_model(cae, to_file=plot, show_shapes=True)
-
-    x_train, x_test = sklearn.model_selection.train_test_split(new_geometry, shuffle=False)
-
-    # Save the structure
-    structure = pkg_resources.resource_filename('AMnet', 'trained_models/conv_geometry_autoencoder_structure.yml')
-    temp = open(structure, 'w')
-    temp.write(cae.to_yaml())
-    temp.close()
-
-    weights = pkg_resources.resource_filename('AMnet', 'trained_models/conv_vae_weights.h5')
-    logger = pkg_resources.resource_filename('AMnet', 'trained_models/conv_geometry_vae_training.csv')
-
-    cae.fit(x_train, x_train,
-            shuffle=True,
-            epochs=epochs,
-            validation_data=(x_test, x_test),
-            batch_size=batch_size,
-            verbose=VERBOSE,
-            callbacks=[keras.callbacks.ModelCheckpoint(filepath=weights, verbose=VERBOSE, save_best_only=True),
-                       keras.callbacks.CSVLogger(logger, separator=',', append=False)])
-
-
-    # Final check on metrics
-    x_pred = cae.predict(x_test)
-    mse = keras.backend.mean(keras.losses.binary_crossentropy(x_pred, x_test)).eval()
-    x_pred.fill(numpy.mean(x_train.flatten()))
-    s2 = keras.backend.mean(keras.losses.binary_crossentropy(x_pred, x_test)).eval()
-    r2 = 1-mse/s2
-    print("Final BCE: "+str(mse))
-    print("Final S2: "+str(s2))
-    print("Final R2: "+str(r2))
-    return r2
-
-
 def train_forward_network(epochs, latent_dim, save_results, print_network, load_previous=True):
-    batch_size = 10
+    batch_size = 50
 
     geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
     volume = 10000*volume
     original_dim = pow(G, 3)
-    intermediate_dim = int(pow(10, ((numpy.log10(latent_dim)+numpy.log10(original_dim))/2)))
+    # intermediate_dim = int(pow(10, ((numpy.log10(latent_dim)+numpy.log10(original_dim))/2)))
+    intermediate_dim = 256
 
     x   = keras.layers.Input(shape=(original_dim,))
     de1 = keras.layers.Dense(intermediate_dim, activation='relu')(x)
     con = keras.layers.Dense(latent_dim, activation='relu')(de1)
-    dd2 = keras.layers.Dense(int(latent_dim/2), activation='relu')(con)
+    dd2 = keras.layers.Dense(int(numpy.ceil(latent_dim/2)), activation='relu')(con)
     y   = keras.layers.Dense(1, activation='relu')(dd2)
 
     # Build and compile ,model
@@ -226,69 +166,6 @@ def train_forward_network(epochs, latent_dim, save_results, print_network, load_
 
     # Save model structure and start training
     x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(flattened_geometry, volume, shuffle=False)
-
-    if save_results:
-        mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, batch_size=batch_size, shuffle=False, validation_data=(x_test, y_test),
-                callbacks=[keras.callbacks.ModelCheckpoint(filepath=weights, verbose=VERBOSE, save_best_only=True)])
-
-        # Save decoder structure and weights
-        temp = open(structure, 'w')
-        temp.write(mdl.to_yaml())
-        temp.close()
-    else:
-        mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, shuffle=False, batch_size=batch_size, validation_data=(x_test, y_test))
-
-    if print_network:
-        keras.utils.plot_model(mdl, to_file=plot, show_shapes=True)
-
-    #
-    mdl.load_weights(weights)
-    y_pred = mdl.predict(x_test)
-    s2 = numpy.mean(numpy.power(y_test-numpy.mean(y_train), 2))
-    mse = numpy.mean(numpy.power(y_pred[:, 0]-y_test, 2))
-    r2 = 1-mse/s2
-    print("Final MSE: "+str(mse))
-    print("Final S2: "+str(s2))
-    print("Final R2: "+str(r2))
-
-    return r2
-
-
-def train_convolutional_forward_network(epochs, latent_dim, save_results, print_network, load_previous=True):
-    batch_size = 300
-
-    geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
-    volume = 10000*volume
-
-    input_vox = keras.layers.Input(shape=(G, G, G, 1))  # adapt this if using `channels_first` image data format
-    x = keras.layers.Conv3D(16, (1, 1, 1), activation='relu', padding='same')(input_vox)
-    x = keras.layers.MaxPooling3D((2, 2, 2), padding='valid')(x)
-    x = keras.layers.Conv3D(8, (1, 1, 1), activation='relu', padding='same')(x)
-    x = keras.layers.MaxPooling3D((5, 5, 5), padding='valid')(x)
-    x = keras.layers.Flatten()(x)
-    x = keras.layers.Dense(5*5*5*2, activation='relu')(x)
-    y = keras.layers.Dense(1, activation='relu')(x)
-
-    # Build and compile ,model
-    mdl = keras.models.Model(input_vox, y)
-    mdl.compile(optimizer='rmsprop', loss='mse')
-
-    # # Instantiate and freeze layers if possible
-    if load_previous:
-        temp = open(pkg_resources.resource_filename('AMnet', 'trained_models/conv_geometry_autoencoder_structure.yml'), 'r')
-        geo = keras.models.model_from_yaml(temp.read())
-        geo.load_weights(pkg_resources.resource_filename('AMnet', 'trained_models/conv_vae_weights.h5'))
-        for i in range(4):
-            mdl.layers[i].set_weights(geo.layers[i].get_weights())
-            mdl.layers[i].trainable = False
-
-    # Make file names
-    weights = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'forward_weights.h5')
-    structure = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'forward_structure.yml')
-    plot = pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'forward.eps')
-
-    # Save model structure and start training
-    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(numpy.expand_dims(geometry, 4), volume, shuffle=False)
 
     if save_results:
         mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, batch_size=batch_size, shuffle=False, validation_data=(x_test, y_test),
