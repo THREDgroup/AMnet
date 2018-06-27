@@ -14,20 +14,20 @@ def extract_data(size):
     file_list = [f for f in os.listdir(path_to_data) if os.path.isfile(os.path.join(path_to_data, f))]
     geometry = []
     flattened_geometry = []
-    volume = []
+    mass = []
+    support_material = []
+    print_time =[]
     sumsum = []
     for file in file_list:
-        print(file)
         data = scipy.io.loadmat(os.path.join(path_to_data, file))
         # print(sum(data['c'].flatten()))
         v = sum(data['c'].flatten()/pow(len(data['c']), 3))
-        if v > 0.001:
+        if v > 0:
             geometry.append(data['c'])
             flattened_geometry.append(data['c'].flatten())
-            volume.append(v)
-            print("good")
-        elif v == 0:
-            print(file)
+            mass.append(data['mass'])
+            print_time.append(data['print_time'])
+            support_material.append(data['support_material'])
 
     N = len(geometry)
     print(N)
@@ -36,7 +36,9 @@ def extract_data(size):
     numpy.savez(pkg_resources.resource_filename('AMnet', 'data/data_geometry.npz'),
                 geometry=geometry,
                 flattened_geometry=flattened_geometry,
-                volume=volume)
+                mass=mass,
+                support_material=support_material,
+                print_time=print_time)
     numpy.savez(pkg_resources.resource_filename('AMnet', 'data/constants.npz'), N=N, G=G)
 
     return True
@@ -44,12 +46,14 @@ def extract_data(size):
 
 def augment_data():
     # Load the data
-    geometry, volume, _, N, G = AMnet.utilities.load_data()
+    geometry, mass, support_material, print_time, _, N, G = AMnet.utilities.load_data()
 
     # Define some variables
     augmented_geometry = []
     augmented_flattened_geometry = []
-    augmented_volume = []
+    augmented_mass = []
+    augmented_print_time = []
+    augmented_support_material = []
 
     # Make some rotation options
     faces = []
@@ -62,25 +66,31 @@ def augment_data():
 
     for i, part in enumerate(geometry):
         for face in faces:
-            vol = volume[i]
+            m = mass[i]
+            sm = support_material[i]
+            pt = print_time[i]
             temp = part
             temp = numpy.rot90(temp, face[0], face[1])
             for quadrant in range(4):
                 temp_rotated = numpy.rot90(temp, quadrant+1, (0, 1))
                 augmented_geometry.append(temp_rotated)
                 augmented_flattened_geometry.append(temp_rotated.flatten())
-                augmented_volume.append(vol)
+                augmented_mass.append(m)
+                augmented_print_time.append(pt)
+                augmented_support_material.append(sm)
 
     # Shuffle the data
-    x = list(range(len(augmented_volume)))
+    x = list(range(len(augmented_mass)))
     random.shuffle(x)
 
     numpy.savez(pkg_resources.resource_filename('AMnet', 'data/data_geometry.npz'),
                 geometry=[augmented_geometry[idx] for idx in x],
                 flattened_geometry=[augmented_flattened_geometry[idx] for idx in x],
-                volume=[augmented_volume[idx] for idx in x])
-    numpy.savez(pkg_resources.resource_filename('AMnet', 'data/constants.npz'), N=len(volume), G=G)
+                mass=[augmented_mass[idx] for idx in x],
+                support_material=[augmented_support_material[idx] for idx in x],
+                print_time=[augmented_print_time[idx] for idx in x])
+    numpy.savez(pkg_resources.resource_filename('AMnet', 'data/constants.npz'), N=len(augmented_mass), G=G)
 
-    print(len(augmented_volume))
+    print(len(augmented_mass))
 
     return True

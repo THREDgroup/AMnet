@@ -127,7 +127,7 @@ def plot_delta_along_axes(case, dimensions, instances, delta):
     autoencoder_network = AMnet.application.Network(structure, weights)
 
     # Load data
-    geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
+    geometry, mass, support_material, print_time, flattened_geometry, N, G = AMnet.utilities.load_data()
 
     # Find best example design
     output = autoencoder_network.predict_raw(flattened_geometry)
@@ -168,7 +168,7 @@ def plot_delta_along_axes(case, dimensions, instances, delta):
 
 
 def plot_examples_for_data_augmentation(idx):
-    geometry, _, _, N, _ = AMnet.utilities.load_data()
+    geometry, mass, support_material, print_time, flattened_geometry, N, G = AMnet.utilities.load_data()
 
     # Make some rotation options
     faces = []
@@ -179,11 +179,15 @@ def plot_examples_for_data_augmentation(idx):
     faces.append([1, (0, 2)])
     faces.append([3, (0, 2)])
 
-    for i, part in enumerate(geometry):
-        for j, face in enumerate(faces):
-            temp = part
-            temp = numpy.rot90(temp, face[0], face[1])
-            for quadrant in range(4):
-                temp_rotated = numpy.rot90(temp, quadrant+1, (0, 1))
+    counter = 0
+    for j, face in enumerate(faces):
+        temp = geometry[idx]
+        temp = numpy.rot90(temp, face[0], face[1])
+        for quadrant in range(4):
+            temp_rotated = numpy.rot90(temp, quadrant+1, (0, 1))
+            ax = matplotlib.pyplot.subplot(1, 1, 1, projection='3d')
+            plot_voxels(ax, temp_rotated, 'b', False, True)
+            matplotlib.pyplot.savefig(pkg_resources.resource_filename("AMnet", "figures/augmentation_examples_"+str(counter)+".png"), dpi=1000)
+            counter+=1
 
     return True

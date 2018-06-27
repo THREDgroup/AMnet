@@ -21,7 +21,7 @@ class Network(object):
         self._load_data()
 
     def _load_data(self):
-        self.geometry, self.volume, self.flattened_geometry, self.N, self.G = AMnet.utilities.load_data()
+        self.geometry, self.mass, self.support_material, self.print_time, self.flattened_geometry, self.N, self.G = AMnet.utilities.load_data()
 
     def prediction(self, idx=None):
 

@@ -5,18 +5,19 @@ import pkg_resources
 import os
 import AMnet.utilities
 
-VERBOSE = 1
+VERBOSE = 0
 
 
-def variational_autoencoder(epochs, latent_dim, save_results, print_network):
-    geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
+def variational_autoencoder(epochs: int, latent_dim: int, save_results: bool, print_network: bool) -> numpy.ndarray:
+    # Load the data
+    geometry, mass, support_material, print_time, flattened_geometry, N, G = AMnet.utilities.load_data()
 
+    # Define a few hardcoded things
     batch_size = 50
-    original_dim = G*G*G
-    # intermediate_dim1 = int(pow(10, (0.5*numpy.log10(latent_dim)+0.5*numpy.log10(original_dim))))
     intermediate_dim1 = 256
     epsilon_std = 1.0
 
+    original_dim = pow(G, 3)
     x = keras.layers.Input(shape=(original_dim,))
     h = keras.layers.Dense(intermediate_dim1, activation='relu')(x)
     z_mean = keras.layers.Dense(latent_dim)(h)
@@ -90,8 +91,6 @@ def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     _x_decoded_mean2 = decoder_mean(_h_decoded2)
     autoencoder = keras.models.Model(x, _x_decoded_mean2)
 
-    structure = []
-    weights = []
     if save_results:
         # Save encoder structure and weights
         temp = open(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_structure.yml'), 'w')
@@ -130,14 +129,18 @@ def variational_autoencoder(epochs, latent_dim, save_results, print_network):
     return r2
 
 
-def train_forward_network(epochs, latent_dim, save_results, print_network, load_previous=True):
+def train_forward_network(epochs: int, latent_dim: int, save_results: bool, print_network: bool, variable: str,
+                          load_previous: bool=True) -> numpy.ndarray:
     batch_size = 50
 
-    geometry, volume, flattened_geometry, N, G = AMnet.utilities.load_data()
-    volume = 10000*volume
+    # Load the data
+    geometry, mass, support_material, print_time, flattened_geometry, N, G = AMnet.utilities.load_data()
     original_dim = pow(G, 3)
-    # intermediate_dim = int(pow(10, ((numpy.log10(latent_dim)+numpy.log10(original_dim))/2)))
     intermediate_dim = 256
+    variable_for_prediction = eval(variable)
+
+    # Avoid roundoff error by making sure mean is 1
+    # variable_for_prediction /= numpy.mean(variable_for_prediction)
 
     x   = keras.layers.Input(shape=(original_dim,))
     de1 = keras.layers.Dense(intermediate_dim, activation='relu')(x)
@@ -147,6 +150,12 @@ def train_forward_network(epochs, latent_dim, save_results, print_network, load_
 
     # Build and compile ,model
     mdl = keras.models.Model(x, y)
+
+    # # Instantiate and freeze layers if possible
+    # if load_previous:
+    #     mdl.layers[1].trainable = False
+    #     mdl.layers[2].trainable = False
+
     mdl.compile(optimizer='rmsprop', loss='mse')
 
     # # Instantiate and freeze layers if possible
@@ -155,17 +164,16 @@ def train_forward_network(epochs, latent_dim, save_results, print_network, load_
         geo = keras.models.model_from_yaml(temp.read())
         geo.load_weights(pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'geometry_encoder_weights.h5'))
         mdl.layers[1].set_weights(geo.layers[1].get_weights())
-        mdl.layers[1].trainable = False
         mdl.layers[2].set_weights(geo.layers[2].get_weights())
-        mdl.layers[2].trainable = False
+
 
     # Make file names
-    weights = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'forward_weights.h5')
-    structure = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'forward_structure.yml')
-    plot = pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'forward.eps')
+    weights = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'_'+variable+'_forward_weights.h5')
+    structure = pkg_resources.resource_filename('AMnet', 'trained_models/'+str(latent_dim)+'_'+variable+'_forward_structure.yml')
+    plot = pkg_resources.resource_filename('AMnet', 'figures/'+str(latent_dim)+'_'+variable+'_forward.eps')
 
     # Save model structure and start training
-    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(flattened_geometry, volume, shuffle=False)
+    x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(flattened_geometry, variable_for_prediction, shuffle=False)
 
     if save_results:
         mdl.fit(x_train, y_train, verbose=VERBOSE, epochs=epochs, batch_size=batch_size, shuffle=False, validation_data=(x_test, y_test),
@@ -186,9 +194,12 @@ def train_forward_network(epochs, latent_dim, save_results, print_network, load_
     y_pred = mdl.predict(x_test)
     s2 = numpy.mean(numpy.power(y_test-numpy.mean(y_train), 2))
     mse = numpy.mean(numpy.power(y_pred[:, 0]-y_test, 2))
-    r2 = 1-mse/s2
-    print("Final MSE: "+str(mse))
-    print("Final S2: "+str(s2))
-    print("Final R2: "+str(r2))
+    r2_test = 1.0-mse/s2
+    y_pred = mdl.predict(x_train)
+    s2 = numpy.mean(numpy.power(y_train-numpy.mean(y_train), 2))
+    mse = numpy.mean(numpy.power(y_pred[:, 0]-y_train, 2))
+    r2_train = 1.0-mse/s2
+    print("Final R2 test:  "+str(r2_test))
+    print("Final R2 train: "+str(r2_train))
 
-    return r2
+    return r2_test, r2_train
