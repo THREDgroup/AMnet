@@ -1,1 +1,1 @@
-See [the docs](https://hsdl.github.io/AMnet/) for more information.
+See [the docs](https://thredgroup.github.io/AMnet/) for more information.
